@@ -1,51 +1,63 @@
 import requests
-from bs4 import BeautifulSoup
 import os
+import praw
+import configparser
+from prawcore.exceptions import ResponseException
+
+
+def get_reddit_tokens():
+
+    # reads tokens needed for accessing reddit api from config file
+    # or creates a template to be filled out with the user credensh
+
+    config = configparser.ConfigParser()
+    config.read('config.ini')
+    client_id = config['REDDIT']['client_id']
+    client_secret = config['REDDIT']['client_secret']
+    user_agent = config['REDDIT']['user_agent']
+
+    return client_id, client_secret, user_agent
+
+
+def get_image_urls(sub, amount):
+
+    # returns a list of image urls for a specified number of the most
+    # recent  submissions from a subreddit
+
+    try:
+        client_id, client_secret, user_agent = get_reddit_tokens()
+
+        reddit = praw.Reddit(client_id=client_id,
+                             client_secret=client_secret,
+                             user_agent=user_agent)
+
+        submissions = reddit.subreddit(sub).new(limit=amount)
+        submission_urls = [submission.url for submission in submissions]
+        image_urls = [item for item in submission_urls if item.endswith(".jpg")]
+
+        return image_urls
+
+    except ResponseException:
+
+        print("Client info is wrong. Check again.")
+
+        return 0
 
 
 def get_new_file_number():
-
-    # iterates through the image directory's consecutively numbered filenames
+    # iterates over the image directory's consecutively numbered filenames
     # and returns the next available number so no files will be overwritten
 
-    path = os.getcwd()
+    my_dir = os.listdir(os.getcwd())
+    all_files = sorted([file for file in my_dir if file.endswith(".jpg")])
+    last_file = all_files[-1].rstrip(".jpg")
+    new_file_number = int(last_file[-2:]) + 1
 
-    for root, dirs, files in os.walk(path):
-        my_files = sorted([fi for fi in files if fi.endswith(".jpg")])
-        raw_name = my_files[-1].rstrip(".jpg")
-        file_number = int(raw_name[-1]) + 1
-
-    return file_number
+    return new_file_number
 
 
-def get_sub_images(url):
-
-    # takes subreddit name as argument
-    r_url = f'https://www.reddit.com/r/{url}/new/'
-
-    page = requests.get(r_url, headers={'User-Agent': 'imageBot'})
-    soup = BeautifulSoup(page.text, "html.parser")
-
-    # saves als img urls in a list and throws out random reddit pixels
-
-    images = soup.find_all('img')
-    unclean_img_srces = [image.get('src') for image in images]
-    img_srces = [x for x in unclean_img_srces if x is not None]
-
-    image_urls = [i for i in img_srces if "renderTimingPixel.png" not in i]
-
-    # changes cwd to new directory (or creates it first)
-
-    img_directory = f"{url}pics"
-
-    try:
-        os.mkdir(img_directory)
-        os.chdir(img_directory)
-
-    except FileExistsError:
-        os.chdir(img_directory)
-
-    # iterating through the image list and comparing the urls to the newest
+def get_unused_pics(image_urls):
+    # iterates through image list comparing the urls to the newest
     # image url from the last run and cutting off the list at the
     # index of the duplicate to only get each image once
     # then overwrite the file with the url of the first item in the new list
@@ -56,43 +68,67 @@ def get_sub_images(url):
     try:
         with open("url_tracking.txt", "r") as f:
             last_url = f.read()
-        for index, imgurl in enumerate(image_urls):
-            if imgurl == last_url:
-                end_index = index       # end_index darf nicht mit eingeschlossen sein
-                unused_pics = image_urls[:end_index]
-                if len(unused_pics) > 0:
-                    with open("url_tracking.txt", 'w') as f:
-                        f.write(unused_pics[0])
-                else:
-                    return "No new pics found."
+        if last_url in image_urls:
+            for index, imgurl in enumerate(image_urls):
+                if imgurl == last_url:
+                    end_index = index  # cut-off to avoid repeat pictures in the list
+                    unused_pics = image_urls[:end_index]
+        else:
+            unused_pics = image_urls
+
+        if len(unused_pics) > 0:
+            with open("url_tracking.txt", 'w') as f:
+                f.write(unused_pics[0])
+        else:
+            print("No new pics found.")
 
     except FileNotFoundError:
         with open("url_tracking.txt", "w") as f:
             f.write(newest_pic)
         unused_pics = image_urls
 
+    return unused_pics
+
+
+def save_new_images(new_images_urls):
+
     try:
         new_file_number = get_new_file_number()
-        print(new_file_number)
 
     except:
-        print("couldn't get last file number")
+        print("couldn't get last file number, starting count from zero")
         new_file_number = 0
 
     counter = 0
 
-    for url in unused_pics:
+    for url in new_images_urls:
         source = requests.get(url)
         if source.status_code == 200:
-            img_file = f'{img_directory}-{new_file_number}.jpg'
+            img_file = f'{img_directory}-{f"{new_file_number:02d}"}.jpg'
             img_data = requests.get(url).content
             open(img_file, 'wb').write(img_data)
         else:
-            return "url cannot be reached"
+            print("url cannot be reached")
         counter += 1
-        new_file_number +=1
+        new_file_number += 1
 
-    return f"{counter} new images saved."
+    print(f"{counter} new images saved.")
 
 
-print(get_sub_images("pasta"))
+if __name__ == '__main__':
+
+    subreddit = 'pasta'
+    number = 10
+    img_directory = f"{subreddit}pics"
+
+    pasta_urls = get_image_urls(subreddit, number)
+
+    try:
+        os.mkdir(img_directory)
+        os.chdir(img_directory)
+
+    except FileExistsError:
+        os.chdir(img_directory)
+
+    new_images = get_unused_pics(pasta_urls)
+    save_new_images(new_images)
