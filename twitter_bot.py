@@ -1,6 +1,7 @@
 import tweepy
 import configparser
 import os
+from time import sleep
 
 
 def get_twitter_tokens():
@@ -45,6 +46,8 @@ def get_twitter_media_id(filename):
 
 if __name__ == '__main__':
 
+    delay = 60 * 60 * 8
+
     consumer_key, consumer_secret, access_token, access_token_secret = get_twitter_tokens()
 
     print('trying to connect...')
@@ -57,12 +60,21 @@ if __name__ == '__main__':
 
     os.chdir('pastapics')
 
-    file_to_tweet = get_filename_for_tweet()
-    media_id = get_twitter_media_id(file_to_tweet)
+    while True:
 
-    api.update_status(media_ids=media_id)
+        print("Looking for a pic to tweet...")
+        file_to_tweet = get_filename_for_tweet()
 
-    remove_tweeted_image()
+        print("Uploading it to twitter...")
+        media_id = get_twitter_media_id(file_to_tweet)
 
+        print("ready to tweet...")
+        api.update_status(media_ids=media_id)
+
+        print("Done!")
+        remove_tweeted_image()
+
+        print(f"image removed from ur directory.\n sleeping for {delay/60/60} hours")
+        sleep(delay)
 
 

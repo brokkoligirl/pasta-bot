@@ -3,6 +3,8 @@ import os
 import praw
 import configparser
 from prawcore.exceptions import ResponseException
+import re
+from time import sleep
 
 
 def get_reddit_tokens():
@@ -50,8 +52,9 @@ def get_new_file_number():
 
     my_dir = os.listdir(os.getcwd())
     all_files = sorted([file for file in my_dir if file.endswith(".jpg")])
-    last_file = all_files[-1].rstrip(".jpg")
-    new_file_number = int(last_file[-2:]) + 1
+    last_file = all_files[-1]
+    get_number = re.findall(r"\d+", last_file)[0]
+    new_file_number = int(get_number) + 1
 
     return new_file_number
 
@@ -104,7 +107,7 @@ def save_new_images(new_images_urls):
     for url in new_images_urls:
         source = requests.get(url)
         if source.status_code == 200:
-            img_file = f'{img_directory}-{f"{new_file_number:02d}"}.jpg'
+            img_file = f'{img_directory}-{f"{new_file_number:04d}"}.jpg'
             img_data = requests.get(url).content
             open(img_file, 'wb').write(img_data)
         else:
@@ -118,17 +121,23 @@ def save_new_images(new_images_urls):
 if __name__ == '__main__':
 
     subreddit = 'pasta'
-    number = 10
+    number = 20
     img_directory = f"{subreddit}pics"
+    delay = 60 * 60 * 6
 
-    pasta_urls = get_image_urls(subreddit, number)
+    while True:
 
-    try:
-        os.mkdir(img_directory)
-        os.chdir(img_directory)
+        pasta_urls = get_image_urls(subreddit, number)
 
-    except FileExistsError:
-        os.chdir(img_directory)
+        try:
+            os.mkdir(img_directory)
+            os.chdir(img_directory)
 
-    new_images = get_unused_pics(pasta_urls)
-    save_new_images(new_images)
+        except FileExistsError:
+            os.chdir(img_directory)
+
+        new_images = get_unused_pics(pasta_urls)
+        save_new_images(new_images)
+
+        print(f"sleeping for {delay/60/60} hours")
+        sleep(delay)
