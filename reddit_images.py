@@ -1,3 +1,6 @@
+
+# !/usr/bin/python3
+
 import requests
 import os
 import praw
@@ -5,6 +8,7 @@ import configparser
 from prawcore.exceptions import ResponseException
 import re
 from time import sleep
+from contextlib import contextmanager
 
 
 def get_reddit_tokens():
@@ -24,7 +28,7 @@ def get_reddit_tokens():
 def get_image_urls(sub, amount):
 
     # returns a list of image urls for a specified number of the most
-    # recent  submissions from a subreddit
+    # recent submissions from a subreddit
 
     try:
         client_id, client_secret, user_agent = get_reddit_tokens()
@@ -35,7 +39,7 @@ def get_image_urls(sub, amount):
 
         submissions = reddit.subreddit(sub).new(limit=amount)
         submission_urls = [submission.url for submission in submissions]
-        image_urls = [item for item in submission_urls if item.endswith(".jpg")]
+        image_urls = [item for item in submission_urls if item.endswith(".jpg")][::-1]  # puts newest pics last
 
         return image_urls
 
@@ -49,12 +53,15 @@ def get_image_urls(sub, amount):
 def get_new_file_number():
     # iterates over the image directory's consecutively numbered filenames
     # and returns the next available number so no files will be overwritten
+    try:
+        my_dir = os.listdir(os.getcwd())
+        all_files = sorted([file for file in my_dir if file.endswith(".jpg")])
+        last_file = all_files[-1]
+        get_number = re.findall(r"\d+", last_file)[0]
+        new_file_number = int(get_number) + 1
 
-    my_dir = os.listdir(os.getcwd())
-    all_files = sorted([file for file in my_dir if file.endswith(".jpg")])
-    last_file = all_files[-1]
-    get_number = re.findall(r"\d+", last_file)[0]
-    new_file_number = int(get_number) + 1
+    except IndexError:
+        new_file_number = 0
 
     return new_file_number
 
@@ -65,7 +72,7 @@ def get_unused_pics(image_urls):
     # index of the duplicate to only get each image once
     # then overwrite the file with the url of the first item in the new list
 
-    newest_pic = image_urls[0]
+    newest_pic = image_urls[-1]
     unused_pics = []
 
     try:
@@ -74,8 +81,8 @@ def get_unused_pics(image_urls):
         if last_url in image_urls:
             for index, imgurl in enumerate(image_urls):
                 if imgurl == last_url:
-                    end_index = index  # cut-off to avoid repeat pictures in the list
-                    unused_pics = image_urls[:end_index]
+                    start_index = index +1  # drops non-new pics from the list
+                    unused_pics = image_urls[start_index:]
         else:
             unused_pics = image_urls
 
@@ -95,49 +102,51 @@ def get_unused_pics(image_urls):
 
 def save_new_images(new_images_urls):
 
-    try:
-        new_file_number = get_new_file_number()
-
-    except:
-        print("couldn't get last file number, starting count from zero")
-        new_file_number = 0
+    new_file_number = get_new_file_number()
 
     counter = 0
 
     for url in new_images_urls:
         source = requests.get(url)
         if source.status_code == 200:
-            img_file = f'{img_directory}-{f"{new_file_number:04d}"}.jpg'
+            img_file = f'{img_directory}-{f"{new_file_number+counter:04d}"}.jpg'
             img_data = requests.get(url).content
             open(img_file, 'wb').write(img_data)
         else:
-            print("url cannot be reached")
+            print("image url cannot be reached rn")
         counter += 1
-        new_file_number += 1
 
     print(f"{counter} new images saved.")
+
+
+@contextmanager
+def change_dir(destination):
+    cwd = os.getcwd()
+    try:
+        os.chdir(destination)
+        yield
+    finally:
+        os.chdir(cwd)
 
 
 if __name__ == '__main__':
 
     subreddit = 'pasta'
-    number = 20
     img_directory = f"{subreddit}pics"
-    delay = 60 * 60 * 6
+    number = 25
+    delay = 60 * 60 * 4
+
+    if not os.path.exists(img_directory):
+        os.mkdir(img_directory)
 
     while True:
 
         pasta_urls = get_image_urls(subreddit, number)
 
-        try:
-            os.mkdir(img_directory)
-            os.chdir(img_directory)
-
-        except FileExistsError:
-            os.chdir(img_directory)
-
-        new_images = get_unused_pics(pasta_urls)
-        save_new_images(new_images)
+        with change_dir(img_directory):
+            new_images = get_unused_pics(pasta_urls)
+            save_new_images(new_images)
 
         print(f"sleeping for {delay/60/60} hours")
+
         sleep(delay)
