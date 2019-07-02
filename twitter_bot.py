@@ -66,11 +66,14 @@ def get_random_trending_hashtag(trend_list):
     return random_trend
 
 
-def compile_status(string, hashtag):
-    one, two = string.split("hashtag")
-    status_message = one + hashtag + two
-    return status_message
-
+def compile_status(string, trend_hashtag):
+    try:
+        one, two = string.split("hashtag")
+        status_message = one + trend_hashtag + two
+        return status_message
+    except ValueError:
+        print(string)
+        print(trend_hashtag)
 
 @contextmanager
 def change_dir(destination):
@@ -132,6 +135,7 @@ while True:
 
     print("compiling tweet...")
     message = compile_status(tweet_text, hashtag)
+    print(message)
 
     print("ready to tweet...")
     api.update_status(media_ids=media_id, status=message)
