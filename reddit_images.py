@@ -1,14 +1,9 @@
-
-# !/usr/bin/python3
-
 import requests
 import os
 import praw
 import configparser
 from prawcore.exceptions import ResponseException
 import re
-from time import sleep
-from contextlib import contextmanager
 
 
 def get_reddit_tokens():
@@ -43,11 +38,11 @@ def get_image_urls(sub, amount):
 
         return image_urls
 
-    except ResponseException:
+    except ResponseException as e:
 
-        print("Client info is wrong. Check again.")
+        print(e)
 
-        return 0
+        return []
 
 
 def get_new_file_number():
@@ -109,7 +104,7 @@ def save_new_images(new_images_urls):
     for url in new_images_urls:
         source = requests.get(url)
         if source.status_code == 200:
-            img_file = f'{img_directory}-{f"{new_file_number+counter:04d}"}.jpg'
+            img_file = f'pastapics-{new_file_number+counter:04d}.jpg'
             img_data = requests.get(url).content
             open(img_file, 'wb').write(img_data)
         else:
@@ -117,36 +112,3 @@ def save_new_images(new_images_urls):
         counter += 1
 
     print(f"{counter} new images saved.")
-
-
-@contextmanager
-def change_dir(destination):
-    cwd = os.getcwd()
-    try:
-        os.chdir(destination)
-        yield
-    finally:
-        os.chdir(cwd)
-
-
-if __name__ == '__main__':
-
-    subreddit = 'pasta'
-    img_directory = f"{subreddit}pics"
-    number = 25
-    delay = 60 * 60 * 4
-
-    if not os.path.exists(img_directory):
-        os.mkdir(img_directory)
-
-    while True:
-
-        pasta_urls = get_image_urls(subreddit, number)
-
-        with change_dir(img_directory):
-            new_images = get_unused_pics(pasta_urls)
-            save_new_images(new_images)
-
-        print(f"sleeping for {delay/60/60} hours")
-
-        sleep(delay)

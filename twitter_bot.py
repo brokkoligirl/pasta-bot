@@ -7,6 +7,7 @@ import os
 import random
 from time import sleep
 from contextlib import contextmanager
+import reddit_images as r
 
 
 def get_twitter_tokens():
@@ -81,50 +82,61 @@ def change_dir(destination):
         os.chdir(cwd)
 
 
-if __name__ == '__main__':
+# if __name__ = "__main__"
 
-    delay = 60 * 60 * 20
+subreddit = 'pasta'
+img_directory = f"{subreddit}pics"
+number = 25
+delay = 60 * 60 * 17
 
-    consumer_key, consumer_secret, access_token, access_token_secret = get_twitter_tokens()
+consumer_key, consumer_secret, access_token, access_token_secret = get_twitter_tokens()
 
-    print('trying to connect...')
+print('trying to connect...')
 
-    auth = tweepy.OAuthHandler(consumer_key, consumer_secret)
-    auth.set_access_token(access_token, access_token_secret)
-    api = tweepy.API(auth)
+auth = tweepy.OAuthHandler(consumer_key, consumer_secret)
+auth.set_access_token(access_token, access_token_secret)
+api = tweepy.API(auth)
 
-    print('Connected!\n')
+print('Connected!')
 
-    while True:
+while True:
 
-        print("Selecting a status message...")
-        with open("tweets.txt", "r") as f:
-            tweet_text = random.choice(f.readlines())
+    if not os.path.exists(img_directory):
+        os.mkdir(img_directory)
 
-        print("Looking at the current trends...")
-        current_us_trends = get_place_trends(23424977)
+    pasta_urls = r.get_image_urls(subreddit, number)
 
-        print("Selecting a hashtag...")
-        hashtag = get_random_trending_hashtag(current_us_trends)
+    with change_dir(img_directory):
+        new_images = r.get_unused_pics(pasta_urls)
+        r.save_new_images(new_images)
 
-        with change_dir("pastapics"):
-            print("Looking for a pic to tweet...")
-            file_to_tweet = get_filename_for_tweet()
+    print("Selecting a status message...")
+    with open("tweets.txt", "r") as f:
+        tweet_text = random.choice(f.readlines())
 
-            print("Found one! Uploading it to twitter...")
-            media_id = get_twitter_media_id(file_to_tweet)
+    print("Looking at the current trends...")
+    current_us_trends = get_place_trends(23424977)
 
-            print("done. removing it from ur direc...")
-            remove_tweeted_image()
+    print("Selecting a hashtag...")
+    hashtag = get_random_trending_hashtag(current_us_trends)
 
-        print("compiling tweet...")
-        message = compile_status(tweet_text, hashtag)
+    with change_dir("pastapics"):
+        print("Looking for a pic to tweet...")
+        file_to_tweet = get_filename_for_tweet()
 
-        print("ready to tweet...")
-        api.update_status(media_ids=media_id, status=message)
+        print("Found one! Uploading it to twitter...")
+        media_id = get_twitter_media_id(file_to_tweet)
 
-        print("Done!")
-        print(f"sleeping for {delay/60/60} hours")
-        sleep(delay)
+        print("done. removing it from ur direc...")
+        remove_tweeted_image()
+
+    print("compiling tweet...")
+    message = compile_status(tweet_text, hashtag)
+
+    print("ready to tweet...")
+    api.update_status(media_ids=media_id, status=message)
+
+    print(f"Done! Sleeping for {delay/60/60} hours")
+    sleep(delay)
 
 
