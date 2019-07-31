@@ -8,7 +8,8 @@ import random
 from time import sleep
 from contextlib import contextmanager
 import reddit_images as r
-
+import sys
+import datetime
 
 def get_twitter_tokens():
 
@@ -24,12 +25,18 @@ def get_twitter_tokens():
 def get_filename_for_tweet():
 
     # selects the first image from sorted list of files in current directory
-    directory = os.getcwd()
-    my_dir = os.listdir(directory)
-    all_files = sorted([file for file in my_dir if file.endswith(".jpg")])
-    filename = all_files[0]
+    try:
+        directory = os.getcwd()
+        my_dir = os.listdir(directory)
+        all_files = sorted([file for file in my_dir if file.endswith(".jpg")])
+        filename = all_files[0]
 
-    return filename
+        return filename
+
+    except IndexError:
+        # if dir is empty
+        print("no files in the directory. cannot tweet >:-(")
+        sys.exit()
 
 
 def remove_tweeted_image():
@@ -51,8 +58,10 @@ def get_twitter_media_id(filename):
 def get_place_trends(woeid):
     # woeid (can be int or str): Yahoo! Where On Earth ID of the location (Global is 1)
     # list of woeids: https://codebeautify.org/jsonviewer/f83352
-    local_trends = api.trends_place(id=woeid) # returns a list with 1 huge dict
-    trend_dict_list = local_trends[0]["trends"] # extracting a list with trends from the huge dict
+    local_trends = api.trends_place(id=woeid)
+    # a list with 1 huge dict:
+    trend_dict_list = local_trends[0]["trends"]
+    # extracting a list with trends from the huge dict
     just_trends = [i["name"] for i in trend_dict_list]
 
     return just_trends
@@ -70,10 +79,19 @@ def compile_status(string, trend_hashtag):
     try:
         one, two = string.split("hashtag")
         status_message = one + trend_hashtag + two
-        return status_message
+
     except ValueError:
-        print(string)
-        print(trend_hashtag)
+        print("I couldn't compile a status out of these:")
+        print("Text: ", string)
+        print("Hashtag: ", trend_hashtag)
+
+        date = datetime.datetime.today()
+        today = datetime.datetime.strftime(date, "%B %d")
+        status_message = f"As a bot, I can't do much. But I can read a calendar. " \
+            f"{today}, what an amazing day to look at some pasta ..."
+
+    return status_message
+
 
 @contextmanager
 def change_dir(destination):
@@ -85,12 +103,12 @@ def change_dir(destination):
         os.chdir(cwd)
 
 
-# if __name__ = "__main__"
+# if __name__ == "__main__"
 
 subreddit = 'pasta'
 img_directory = f"{subreddit}pics"
 number = 25
-delay = 60 * 60 * 17
+delay = 16 * 60 * 60
 
 consumer_key, consumer_secret, access_token, access_token_secret = get_twitter_tokens()
 
@@ -135,12 +153,10 @@ while True:
 
     print("compiling tweet...")
     message = compile_status(tweet_text, hashtag)
-    print(message)
 
     print("ready to tweet...")
     api.update_status(media_ids=media_id, status=message)
 
     print(f"Done! Sleeping for {delay/60/60} hours")
     sleep(delay)
-
 
