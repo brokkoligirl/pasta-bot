@@ -4,12 +4,12 @@ import praw
 import configparser
 from prawcore.exceptions import ResponseException
 import re
+import sys
 
 
 def get_reddit_tokens():
 
     # reads tokens needed for accessing reddit api from config file
-    # or creates a template to be filled out with the user credensh
 
     config = configparser.ConfigParser()
     config.read('config.ini')
@@ -22,7 +22,7 @@ def get_reddit_tokens():
 
 def get_image_urls(sub, amount):
 
-    # returns a list of image urls for a specified number of the most
+    # returns a list of image urls for (amount) of the most
     # recent submissions from a subreddit
 
     try:
@@ -46,8 +46,10 @@ def get_image_urls(sub, amount):
 
 
 def get_new_file_number():
-    # iterates over the image directory's consecutively numbered filenames
+
+    # iterates over the image directory's consecutively numbered file names
     # and returns the next available number so no files will be overwritten
+
     try:
         my_dir = os.listdir(os.getcwd())
         all_files = sorted([file for file in my_dir if file.endswith(".jpg")])
@@ -62,10 +64,13 @@ def get_new_file_number():
 
 
 def get_unused_pics(image_urls):
-    # iterates through image list comparing the urls to the newest
-    # image url from the last run and cutting off the list at the
-    # index of the duplicate to only get each image once
-    # then overwrite the file with the url of the first item in the new list
+
+    # iterates through image url list comparing the urls against a tracking file
+    # that saves the url of the newest image each time it is run
+
+    if len(image_urls) == 0:
+        print("could not grab urls >:-(")
+        sys.exit()
 
     newest_pic = image_urls[-1]
     unused_pics = []
@@ -73,17 +78,22 @@ def get_unused_pics(image_urls):
     try:
         with open("url_tracking.txt", "r") as f:
             last_url = f.read()
+
+        # comparing url list with last url to avoid repeat posts
         if last_url in image_urls:
             for index, imgurl in enumerate(image_urls):
                 if imgurl == last_url:
-                    start_index = index +1  # drops non-new pics from the list
+                    start_index = index + 1  # drop non-new pics from the list
                     unused_pics = image_urls[start_index:]
         else:
             unused_pics = image_urls
 
+        # saving the last item from unused_pics as the new last file
+        # so that only pics posted after it will be collected next time
         if len(unused_pics) > 0:
             with open("url_tracking.txt", 'w') as f:
-                f.write(unused_pics[0])
+                f.write(unused_pics[-1])
+
         else:
             print("No new pics found.")
 
@@ -92,7 +102,8 @@ def get_unused_pics(image_urls):
             f.write(newest_pic)
         unused_pics = image_urls
 
-    return unused_pics
+    # reversing them so that the newest ones get used first
+    return unused_pics[::-1]
 
 
 def save_new_images(new_images_urls):
@@ -107,8 +118,9 @@ def save_new_images(new_images_urls):
             img_file = f'pastapics-{new_file_number+counter:04d}.jpg'
             img_data = requests.get(url).content
             open(img_file, 'wb').write(img_data)
+            counter += 1
         else:
             print("image url cannot be reached rn")
-        counter += 1
 
     print(f"{counter} new images saved.")
+
