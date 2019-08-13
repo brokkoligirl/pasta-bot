@@ -4,7 +4,9 @@ import praw
 import configparser
 from prawcore.exceptions import ResponseException
 import re
-import sys
+import logging
+
+logger = logging.getLogger("pastabot.reddit_images")
 
 
 def get_reddit_tokens():
@@ -16,6 +18,8 @@ def get_reddit_tokens():
     client_id = config['REDDIT']['client_id']
     client_secret = config['REDDIT']['client_secret']
     user_agent = config['REDDIT']['user_agent']
+
+    logger.info("Grabbed reddit credensh from config file...")
 
     return client_id, client_secret, user_agent
 
@@ -36,11 +40,14 @@ def get_image_urls(sub, amount):
         submission_urls = [submission.url for submission in submissions]
         image_urls = [item for item in submission_urls if item.endswith(".jpg")][::-1]  # puts newest pics last
 
+        logger.info(f"Succesfully grabbed image urls from r/{sub}")
+
         return image_urls
 
     except ResponseException as e:
 
-        print(e)
+        logger.exception("an error occured while grabbing urls from reddit: ", e,
+                         "No urls were grabbed.")
 
         return []
 
@@ -60,6 +67,8 @@ def get_new_file_number():
     except IndexError:
         new_file_number = 0
 
+    logger.info("Found new file number for newly grabbed pics...")
+
     return new_file_number
 
 
@@ -68,9 +77,8 @@ def get_unused_pics(image_urls):
     # iterates through image url list comparing the urls against a tracking file
     # that saves the url of the newest image each time it is run
 
-    if len(image_urls) == 0:
-        print("could not grab urls >:-(")
-        sys.exit()
+    if len(image_urls) == 0:  # in case no urls were grabbed
+        return []
 
     newest_pic = image_urls[-1]
     unused_pics = []
@@ -78,6 +86,8 @@ def get_unused_pics(image_urls):
     try:
         with open("url_tracking.txt", "r") as f:
             last_url = f.read()
+
+        logger.info("reading latest url from tracking file...")
 
         # comparing url list with last url to avoid repeat posts
         if last_url in image_urls:
@@ -95,12 +105,13 @@ def get_unused_pics(image_urls):
                 f.write(unused_pics[-1])
 
         else:
-            print("No new pics found.")
+            logger.info("No new pics found.")
 
     except FileNotFoundError:
         with open("url_tracking.txt", "w") as f:
             f.write(newest_pic)
         unused_pics = image_urls
+        logger.exception("No url tracking file found. Created one.")
 
     # reversing them so that the newest ones get used first
     return unused_pics[::-1]
@@ -120,7 +131,8 @@ def save_new_images(new_images_urls):
             open(img_file, 'wb').write(img_data)
             counter += 1
         else:
-            print("image url cannot be reached rn")
+            logging.warning("an image url could not be reached. "
+                            "Status code was ", source.status_code)
 
-    print(f"{counter} new images saved.")
+    logger.info(f"{counter} new pasta images saved.")
 
