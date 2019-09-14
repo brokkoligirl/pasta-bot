@@ -1,5 +1,6 @@
 .DS_Store
+trainingandtestdata
 config.ini
+pasta.log
 pastapics/**
 __pycache__/**
-

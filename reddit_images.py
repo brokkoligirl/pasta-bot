@@ -11,7 +11,7 @@ logger = logging.getLogger("pastabot.reddit_images")
 
 def get_reddit_tokens():
 
-    # reads tokens needed for accessing reddit api from config file
+    # grabs tokens needed for accessing reddit api from config file
 
     config = configparser.ConfigParser()
     config.read('config.ini')
@@ -19,15 +19,17 @@ def get_reddit_tokens():
     client_secret = config['REDDIT']['client_secret']
     user_agent = config['REDDIT']['user_agent']
 
-    logger.info("Grabbed reddit credensh from config file...")
+    logger.debug("Grabbed reddit credensh from config file...")
 
     return client_id, client_secret, user_agent
 
 
-def get_image_urls(sub, amount):
+def extract_image_urls(sub, amount):
 
-    # returns a list of image urls for (amount) of the most
-    # recent submissions from a subreddit
+    """
+    returns a list of image urls for (amount) of the most
+    recent submissions from a subreddit (sub)
+    """
 
     try:
         client_id, client_secret, user_agent = get_reddit_tokens()
@@ -40,7 +42,7 @@ def get_image_urls(sub, amount):
         submission_urls = [submission.url for submission in submissions]
         image_urls = [item for item in submission_urls if item.endswith(".jpg")][::-1]  # puts newest pics last
 
-        logger.info(f"Succesfully grabbed image urls from r/{sub}")
+        logger.debug(f"Succesfully grabbed image urls from r/{sub}")
 
         return image_urls
 
@@ -54,8 +56,10 @@ def get_image_urls(sub, amount):
 
 def get_new_file_number():
 
-    # iterates over the image directory's consecutively numbered file names
-    # and returns the next available number so no files will be overwritten
+    """
+    iterates over the current directory's consecutively numbered file names
+    and returns the next available number so no files will be overwritten
+    """
 
     try:
         my_dir = os.listdir(os.getcwd())
@@ -67,15 +71,18 @@ def get_new_file_number():
     except IndexError:
         new_file_number = 0
 
-    logger.info("Found new file number for newly grabbed pics...")
+    logger.debug("Found new file number for newly grabbed pics...")
 
     return new_file_number
 
 
-def get_unused_pics(image_urls):
+def filter_unused_pics(image_urls):
 
-    # iterates through image url list comparing the urls against a tracking file
-    # that saves the url of the newest image each time it is run
+    """
+    iterates through image url list comparing the urls against a tracking file
+    that saves the url of the newest image each time it is run
+    :return: list of new image urls that have not yet been saved to local directory
+    """
 
     if len(image_urls) == 0:  # in case no urls were grabbed
         return []
@@ -87,7 +94,7 @@ def get_unused_pics(image_urls):
         with open("url_tracking.txt", "r") as f:
             last_url = f.read()
 
-        logger.info("reading latest url from tracking file...")
+        logger.debug("reading latest url from tracking file...")
 
         # comparing url list with last url to avoid repeat posts
         if last_url in image_urls:
@@ -99,13 +106,13 @@ def get_unused_pics(image_urls):
             unused_pics = image_urls
 
         # saving the last item from unused_pics as the new last file
-        # so that only pics posted after it will be collected next time
+        # so that only pics posted after that will be collected next time
         if len(unused_pics) > 0:
             with open("url_tracking.txt", 'w') as f:
                 f.write(unused_pics[-1])
 
         else:
-            logger.info("No new pics found.")
+            logger.debug("No new pics found.")
 
     except FileNotFoundError:
         with open("url_tracking.txt", "w") as f:
@@ -118,6 +125,10 @@ def get_unused_pics(image_urls):
 
 
 def save_new_images(new_images_urls):
+    """
+    takes a list of image urls and downloads the images, saving them to
+    current directory & giving the files consecutively numbered names
+    """
 
     new_file_number = get_new_file_number()
 
@@ -131,8 +142,10 @@ def save_new_images(new_images_urls):
             open(img_file, 'wb').write(img_data)
             counter += 1
         else:
-            logging.warning("an image url could not be reached. "
-                            "Status code was ", source.status_code)
+            logger.debug("an image url could not be reached. "
+                         "Status code was ", source.status_code)
 
-    logger.info(f"{counter} new pasta images saved.")
+            # TODO: save urls that couldn't be reached & try downloading again later
+
+    logger.debug(f"{counter} new images saved.")
 

@@ -1,5 +1,4 @@
 
-from tweet_compiler import get_twitter_tokens, twitter_auth
 import re
 from textblob import TextBlob
 import tweepy
@@ -14,35 +13,41 @@ from nltk.corpus import wordnet, stopwords
 logger = logging.getLogger("pastabot.sentiments")
 
 
-def grab_trending_tweets_tweepy(trend_topic, number_of_tweets, api=None):
+def grab_trending_tweets(api, trend_topic, number_of_tweets, language='en'):
+
+    """
+    grabs a certain number_of_tweets about a trend_topic
+    in a specific language and returns them as a list
+
+    """
 
     try:
 
-        if api is None:
-            # securing the credentials for logging in
-            consumer_key, consumer_secret, access_token, access_token_secret = get_twitter_tokens()
-            api = twitter_auth(consumer_key, consumer_secret, access_token, access_token_secret)
-
-        # setting up our search query
-        query = tweepy.Cursor(api.search, q=trend_topic, lang="en").items(number_of_tweets)
+        # setting up search query
+        query = tweepy.Cursor(api.search, q=trend_topic, lang=language).items(number_of_tweets)
 
         # and saving the tweets into a list
         list_of_current_tweets = [tweet.text for tweet in query]
-        logger.info(f"Grabbed trending tweets about {trend_topic} with Tweepy. "
+
+        logger.debug(f"Grabbed trending tweets about {trend_topic} with Tweepy. "
                      f"Returning list with {len(list_of_current_tweets)} tweets")
+
         return list_of_current_tweets
 
     except TweepError as e:
+
         logger.exception(f"Unable to grab trending tweets for {trend_topic} because of the "
                          "following error: ", e.response.text)
+
         return []
 
 
 def grab_tweets_by_topic_alt(topic, num_of_tweets):
-
-    # this is an alternative function for grabbing tweets on a current hashtag
-    # just in case twitter is throwing an error with the tweepy approach
-    # it is not preferable tho, because tweets can't be filtered by language
+    """
+    alternative function for grabbing tweets on a current hashtag
+    just in case twitter is throwing an error with the tweepy approach
+    it is not preferable tho, because tweets can't be filtered by language
+    """
 
     tweet_criteria = got.manager.TweetCriteria().setQuerySearch(topic) \
                                                 .setMaxTweets(num_of_tweets)
@@ -54,9 +59,12 @@ def grab_tweets_by_topic_alt(topic, num_of_tweets):
     return topical_tweet_list
 
 
-def tweet_cleaner(tweet):
+def cleanse_tweet(tweet):
+    """
+    takes a tweet and removes urls, numbers, punctuation etc.
+    """
     
-    # removing @mentions allng with RTs and
+    # removing @mentions along with RTs and
     # #-characters (keeping the word/tag itself tho)
     tweet = re.sub(r"(?<!\w)RT|@[A-Za-z0-9]+(_[A-Za-z0-9]+)?", "", tweet)
     tweet = re.sub("#", "", tweet)
@@ -86,7 +94,12 @@ def tweet_cleaner(tweet):
     return tweet
 
 
-def get_wordnet_pos(treebank_tag):
+def convert_pos_tag(treebank_tag):
+
+    """
+    helper function converting pos-tags nltk.pos_tag() returns into
+    pos tags nltk.WordNetLemmatizer can understand.
+    """
 
     if treebank_tag.startswith('J'):
         return wordnet.ADJ
@@ -97,10 +110,17 @@ def get_wordnet_pos(treebank_tag):
     elif treebank_tag.startswith('R'):
         return wordnet.ADV
     else:
-        return 'n'
+        return 'n'  # default tag to fall back on
 
 
-def tokenize_lemmatize(tweet):
+def tokenize_lemmatize_tweet(tweet):
+
+    """
+    function for tokenizing and lemmatizing tweets
+    uses nltks wordnet lemmatizer
+    includes part of speech tagging for more accurate lemmatization
+    """
+
     wn = nltk.WordNetLemmatizer()
 
     lemmatized_tweet = []
@@ -111,18 +131,17 @@ def tokenize_lemmatize(tweet):
     for item in tagged:
         word = item[0]
         tag = item[1]
-        lemmatized = wn.lemmatize(word, pos=get_wordnet_pos(tag))
+        lemmatized = wn.lemmatize(word, pos=convert_pos_tag(tag))
         lemmatized_tweet.append(lemmatized)
 
     return lemmatized_tweet
 
 
 def remove_stopwords(tweet):
+
     stop_words = stopwords.words('english')
     more_noise = ['i’m', "im", "w", "u"]
     stop_words.extend(more_noise)
-    # first condition removes stopwords, second condition removes empty strings
-    # which for some reason turned up when I tried this the first time around
     tweet = [word for word in tweet if word.lower() not in stop_words and word]
 
     return tweet
@@ -130,45 +149,18 @@ def remove_stopwords(tweet):
 
 def analyze_tweet_list(tweet_list):
 
+    """
+    uses TextBlob to extract polarity of each tweet in a list of tweets
+    returns corresponding list of polarity values (between -1 and 1)
+    """
+
     sentiments = []
 
     for tweet in tweet_list:
         blob = TextBlob(tweet)
         sentiments.append(blob.polarity)
 
-    logger.info(f"Grabbed sentiments... mean polarity was {np.mean(sentiments)}")
+    logger.debug(f"Grabbed sentiments... mean polarity was {np.mean(sentiments)}")
 
     return sentiments
 
-
-if __name__ == "__main__":
-
-    logging.basicConfig(filename='myapp.log', level=logging.INFO)
-
-    hashtag = '#kkwbeauty'
-    num_of_tweets = 50
-
-    logging.info(f"The hashtag we're working with is {hashtag}, we're looking at {num_of_tweets} tweets")
-
-    # tweet_list = grab_tweets_by_topic_alt(hashtag, num_of_tweets)
-    tweet_list = grab_trending_tweets_tweepy(hashtag, num_of_tweets)
-    og_sentiments = analyze_tweet_list(tweet_list)
-
-    first_cleanse = [tweet_cleaner(tweet) for tweet in tweet_list]
-
-    lemmatized_tweets = [tokenize_lemmatize(tweet) for tweet in first_cleanse]
-
-    no_stopwords = [remove_stopwords(tweet) for tweet in lemmatized_tweets]
-    cleaned_tweets = [" ".join(tweet) for tweet in no_stopwords]
-    clean_sentiments = analyze_tweet_list(cleaned_tweets)
-
-    for og_tweet, og_sent, cl_tweet, cl_sent in zip(tweet_list,
-                                                    og_sentiments,
-                                                    cleaned_tweets,
-                                                    clean_sentiments):
-        print("og tweet: ", og_tweet)
-        print("og sent: ", og_sent)
-        print("clean tweet: ", cl_tweet)
-        print("clean sent: ", cl_sent)
-        print(np.mean(og_sentiments), np.mean(clean_sentiments))
-        print(20*"-")
