@@ -9,12 +9,16 @@ import logging
 logger = logging.getLogger("pastabot.reddit_images")
 
 
-def get_reddit_tokens():
+def get_reddit_tokens(filename="config.ini"):
 
-    # grabs tokens needed for accessing reddit api from config file
+    """
+    grabs tokens needed for accessing reddit api from config file
+    :param filename: name of config file, defaults to "config.ini"
+    :return: client_id, client_secret, user_agent - credentials for accessing reddit API
+    """
 
     config = configparser.ConfigParser()
-    config.read('config.ini')
+    config.read(filename)
     client_id = config['REDDIT']['client_id']
     client_secret = config['REDDIT']['client_secret']
     user_agent = config['REDDIT']['user_agent']
@@ -24,15 +28,16 @@ def get_reddit_tokens():
     return client_id, client_secret, user_agent
 
 
-def extract_image_urls(sub, amount):
+def extract_image_urls(client_id, client_secret, user_agent, sub, amount):
 
     """
-    returns a list of image urls for (amount) of the most
-    recent submissions from a subreddit (sub)
+    :param client_id, client_secret, user_agent: reddit credentials for making API call
+    :param sub: subreddit from which to extract the image urls
+    :param amount: number of most recent submissions to parse
+    :return: list of image urls
     """
 
     try:
-        client_id, client_secret, user_agent = get_reddit_tokens()
 
         reddit = praw.Reddit(client_id=client_id,
                              client_secret=client_secret,
@@ -114,7 +119,7 @@ def filter_unused_pics(image_urls):
         else:
             logger.debug("No new pics found.")
 
-    except FileNotFoundError:
+    except FileNotFoundError: # in case there is no url tracking file yet
         with open("url_tracking.txt", "w") as f:
             f.write(newest_pic)
         unused_pics = image_urls
@@ -147,5 +152,5 @@ def save_new_images(new_images_urls):
 
             # TODO: save urls that couldn't be reached & try downloading again later
 
-    logger.debug(f"{counter} new images saved.")
+    logger.info(f"{counter} new images saved.")
 

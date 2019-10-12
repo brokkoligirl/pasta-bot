@@ -18,7 +18,11 @@ def grab_trending_tweets(api, trend_topic, number_of_tweets, language='en'):
     """
     grabs a certain number_of_tweets about a trend_topic
     in a specific language and returns them as a list
-
+    :param api: tweepy api object
+    :param trend_topic: a topic; tweets on which are grabbed
+    :param number_of_tweets: number of tweets to be grabbed
+    :param language: language of the tweets to grab, defaults to english
+    :return: list of current tweets about the selected topic
     """
 
     try:
@@ -44,9 +48,12 @@ def grab_trending_tweets(api, trend_topic, number_of_tweets, language='en'):
 
 def grab_tweets_by_topic_alt(topic, num_of_tweets):
     """
-    alternative function for grabbing tweets on a current hashtag
-    just in case twitter is throwing an error with the tweepy approach
-    it is not preferable tho, because tweets can't be filtered by language
+    alternative function for grabbing tweets on a current hashtag.
+    NOT PREFERABLE, because tweets can't be filtered by language.
+    not currently being used
+    :param topic: a topic; tweets on which are grabbed
+    :param num_of_tweets: number of tweets to be grabbed
+    :return: list of current tweets about the selected topic
     """
 
     tweet_criteria = got.manager.TweetCriteria().setQuerySearch(topic) \
@@ -61,16 +68,16 @@ def grab_tweets_by_topic_alt(topic, num_of_tweets):
 
 def cleanse_tweet(tweet):
     """
-    takes a tweet and removes urls, numbers, punctuation etc.
+    removes urls, numbers, punctuation etc.
+    :param tweet: a tweet
+    :returns cleaned tweet
     """
     
-    # removing @mentions along with RTs and
-    # #-characters (keeping the word/tag itself tho)
+    # removing @mentions along with RTs and #-characters
     tweet = re.sub(r"(?<!\w)RT|@[A-Za-z0-9]+(_[A-Za-z0-9]+)?", "", tweet)
     tweet = re.sub("#", "", tweet)
     
-    # this is just substituting the weird ’ with a
-    # regular ' since it is not properly detected otherwise
+    # this is just substituting ’ with a ' since it is not properly detected in removing punctuation
     tweet = re.sub("’", "'", tweet)
     
     # removing some typical urls
@@ -81,7 +88,7 @@ def cleanse_tweet(tweet):
     tweet = re.sub(r"instagr\.am.*\s?", "", tweet)
     tweet = re.sub(r"t\.co.*\s?", "", tweet)
     tweet = re.sub(r"twitter\.com.*\s?", "", tweet)
-    tweet = re.sub(r"[\w/\-?=%.]+\.[\(com)/\-?=%.]+", "", tweet)  # removes urls without http or www (hopefully lol)
+    tweet = re.sub(r"[\w/\-?=%.]+\.[\(com)/\-?=%.]+", "", tweet)  # removes urls without http or www
     
     # removing all numbers and also times (i.e. "12 PM PST"), 
     tweet = re.sub(r"[0-9]+\s*([AaPp][Mm])?\s*([Pp][Ss][Tt])?\s*", "", tweet)
@@ -97,8 +104,8 @@ def cleanse_tweet(tweet):
 def convert_pos_tag(treebank_tag):
 
     """
-    helper function converting pos-tags nltk.pos_tag() returns into
-    pos tags nltk.WordNetLemmatizer can understand.
+    helper function that converts the pos-tags nltk.pos_tag() returns
+    into pos tags nltk.WordNetLemmatizer can understand.
     """
 
     if treebank_tag.startswith('J'):
@@ -117,7 +124,7 @@ def tokenize_lemmatize_tweet(tweet):
 
     """
     function for tokenizing and lemmatizing tweets
-    uses nltks wordnet lemmatizer
+    uses nltk wordnet lemmatizer
     includes part of speech tagging for more accurate lemmatization
     """
 
@@ -138,6 +145,11 @@ def tokenize_lemmatize_tweet(tweet):
 
 
 def remove_stopwords(tweet):
+    """
+    removes stopwords from tweet. uses nltk.corpus stopwords.
+    :param tweet: tweet, still containing stopwords
+    :return: tweet, free of stopwords
+    """
 
     stop_words = stopwords.words('english')
     more_noise = ['i’m', "im", "w", "u"]
@@ -151,7 +163,7 @@ def analyze_tweet_list(tweet_list):
 
     """
     uses TextBlob to extract polarity of each tweet in a list of tweets
-    returns corresponding list of polarity values (between -1 and 1)
+    :returns: list of polarity values (between -1 and 1)
     """
 
     sentiments = []
