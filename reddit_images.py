@@ -51,9 +51,9 @@ def extract_image_urls(client_id, client_secret, user_agent, sub, amount):
 
         return image_urls
 
-    except ResponseException as e:
+    except ResponseException:
 
-        logger.exception("an error occured while grabbing urls from reddit: ", e,
+        logger.exception("an error occured while grabbing urls from reddit: ", ResponseException,
                          "No urls were grabbed.")
 
         return []
@@ -81,7 +81,7 @@ def get_new_file_number():
     return new_file_number
 
 
-def filter_unused_pics(image_urls):
+def filter_unused_pics(image_urls, filename="url_tracking.txt"):
 
     """
     iterates through image url list comparing the urls against a tracking file
@@ -96,7 +96,7 @@ def filter_unused_pics(image_urls):
     unused_pics = []
 
     try:
-        with open("url_tracking.txt", "r") as f:
+        with open(filename, "r") as f:
             last_url = f.read()
 
         logger.debug("reading latest url from tracking file...")
@@ -113,7 +113,7 @@ def filter_unused_pics(image_urls):
         # saving the last item from unused_pics as the new last file
         # so that only pics posted after that will be collected next time
         if len(unused_pics) > 0:
-            with open("url_tracking.txt", 'w') as f:
+            with open(filename, 'w') as f:
                 f.write(unused_pics[-1])
 
         else:

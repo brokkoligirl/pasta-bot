@@ -53,26 +53,29 @@ def get_twitter_media_id(api, filename):
     :return: media_id twitter needs for status updates with media attachments
     """
 
-    file = open(filename, 'rb')
-    upload = api.media_upload(filename=filename, file=file)
-    media_id = [upload.media_id_string]
+    with open(filename, 'rb') as file:
+        upload = api.media_upload(filename=filename, file=file)
+        media_id = [upload.media_id_string]
 
     logger.debug("Uploaded pic and got a media id...")
 
     return media_id
 
 
-def get_local_trends(api, woeid):
+def get_local_trends(api, woeid=23424977):
 
     """
     :param api: tweepy api object for twitter authentication
-    :param woeid: "Where On Earth ID" twitter uses for identifying locations (Global is 1)
+    :param woeid: "Where On Earth ID", used for identifying locations, defaults to US (23424977)
     :return: list of current local trending topics for the given woeid
     """
 
     local_trends = api.trends_place(id=woeid)
+    # returns [{'trends': [{'name': 'TheVoice', etc}, {'name': 'KUWTK', etc.}]}]
     trend_dict_list = local_trends[0]["trends"]
+    # returns [{'name': 'TheVoice', etc}, {'name': 'KUWTK', etc.}]
     trend_list = [i["name"] for i in trend_dict_list]
+    # returns ['TheVoice', 'KUWTK', etc.]
 
     logger.debug(f"Grabbed current local trends for woeid {woeid} from twitter...")
 
@@ -90,17 +93,20 @@ def filter_non_offensive_hashtags(trend_list):
     :return: hashtags, a list with only hashtags and offensive words removed
     """
 
-    hashtags = [trend for trend in trend_list if trend.startswith("#")]
+    hashtags = [trend.lower() for trend in trend_list if trend.startswith("#")]
     og_num_of_tags = len(hashtags)
 
     offensive_list = ["#rip", 'shooting', 'shooter', 'dead', 'death', 'attack',
                       'kill', 'suicide', 'murder', 'terror', 'died', 'pray']
 
-    for trend in hashtags:
-        for tag in offensive_list:
-            if tag in trend:
-                hashtags.remove(trend)
+    offensive_tags = []
 
+    for tag in offensive_list:
+        for trend in hashtags:
+            if tag in trend:
+                offensive_tags.append(trend)
+
+    hashtags = [tag for tag in hashtags if not tag in offensive_tags]
     logger.debug(f"{og_num_of_tags-len(hashtags)} of {og_num_of_tags} hashtags removed during offensiveness screening")
 
     return hashtags
