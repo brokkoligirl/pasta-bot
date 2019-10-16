@@ -112,12 +112,12 @@ def filter_non_offensive_hashtags(trend_list):
     return hashtags
 
 
-def select_tweet():
+def select_tweet(filename="tweets.txt"):
     """
     :return: random tweet from tweets.txt file
     """
 
-    with open("tweets.txt", "r") as f:
+    with open(filename, "r") as f:
         tweet_text = random.choice(f.readlines())
         logger.debug("Selected a status message...")
 
